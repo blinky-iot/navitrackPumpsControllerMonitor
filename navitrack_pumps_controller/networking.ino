@@ -158,6 +158,7 @@ bool mqttConnect() {
 */
 
 void requestSharedAttributes() {
+  attributesReceived = false;
   if (mqttClient.subscribe("v1/devices/me/attributes/response/+")) Serial.println("Device Configuration Attributes Subscription Success");
   if (mqttClient.subscribe("v1/devices/me/attributes")) Serial.println("Device Attributes Changes Subscription Success");
   String payload = "{\"sharedKeys\":\"accessToken,High_Critical_Value,Low_Critical_Value,port,server,telemetryInterval\"}";
@@ -171,46 +172,9 @@ void requestSharedAttributes() {
 }
 
 
-bool requestDigitalOutputAttributes() {
-  // Request DO0–DO7 shared attributes from ThingsBoard
-  String payload = "{\"sharedKeys\":\"DO0,DO1,DO2,DO3,DO4,DO5,DO6,DO7\"}";
-  Serial.println("📡 Requested DO0–DO7 attributes");
-
-  bool success = mqttClient.publish("v1/devices/me/attributes/request/1", payload.c_str());
-  if (success) {
-    Serial.println("✅ Digital Output Attribute Request Successful");
-  } else {
-    Serial.println("❌ Digital Output Attribute Request Failed");
-    return false;
-  }
-
-  // Allow time for callback to process the response
-  unsigned long start = millis();
-  while (millis() - start < 10000) {
-    mqttClient.loop();  // critical for receiving the attributes
-    delay(10);          // prevent watchdog timeout
-  }
-
-  return true;
-}
-
-void handleDigitalOutputAttributesPayload(JsonObject& shared) {
-  for (uint8_t i = 0; i < 8; i++) {
-    String key = "DO" + String(i);
-    if (shared.containsKey(key)) {
-      bool value = shared[key];
-
-      // Update the output buffer only
-      bitWrite(outputBuffer, i, value);  // ✅ Correct for single byte
-      Serial.printf("📥 DO%d attribute received, set buffer bit to %d\n", i, value);
-    }
-  }
-
-  Serial.println("✔️ Output buffer updated from shared attributes.");
-}
 
 
-// --- Callback to handle attribute response
+
 
 /*
   ------------------------------------------------------------------------------
@@ -278,13 +242,139 @@ void handleDigitalOutputAttributesPayload(JsonObject& shared) {
   ------------------------------------------------------------------------------
 */
 
+// void callback(char* topic, byte* payload, unsigned int length) {
+//   Serial.println("📥 MQTT Callback Triggered");
+//   Serial.print("📨 Topic: ");
+//   Serial.println(topic);
+//   String topicStr = String(topic);
+
+//   // Convert payload to JSON string
+//   String json;
+//   for (unsigned int i = 0; i < length; i++) {
+//     json += (char)payload[i];
+//   }
+
+//   Serial.print("📨 Payload: ");
+//   Serial.println(json);
+
+//   // Parse JSON
+//   StaticJsonDocument<512> doc;
+//   DeserializationError error = deserializeJson(doc, json);
+//   if (error) {
+//     Serial.print("❌ JSON parse error: ");
+//     Serial.println(error.c_str());
+//     return;
+//   }
+
+//   // Handle both wrapped and flat payloads
+//   JsonObject root = doc.as<JsonObject>();
+//   JsonObject shared = root.containsKey("shared") ? root["shared"].as<JsonObject>() : root;
+
+//   if (String(topic).startsWith("v1/devices/me/attributes/response")) {
+//     StaticJsonDocument<512> doc;
+//     attributesReceived = true;  // ✅ Set flag
+//     DeserializationError error = deserializeJson(doc, payload, length);
+
+//     if (!error) {
+//       JsonObject shared = doc["shared"];
+//       if (!shared.isNull()) {
+//         handleDigitalOutputAttributesPayload(shared);
+//       }
+//     } else {
+//       Serial.print("❌ JSON Parse error: ");
+//       Serial.println(error.c_str());
+//     }
+//   }
+
+
+//   bool updated = false;
+//   bool mqttNeedsRestart = false;
+
+//   // --- Access Token
+//   if (shared.containsKey("accessToken")) {
+//     String val = shared["accessToken"].as<String>();
+//     if (val != String(deviceSettings.TOKEN)) {
+//       val.toCharArray(deviceSettings.TOKEN, sizeof(deviceSettings.TOKEN));
+//       updated = true;
+//       mqttNeedsRestart = true;
+//       Serial.println("🔐 Updated accessToken");
+//     }
+//   }
+
+//   // --- Server
+//   if (shared.containsKey("server")) {
+//     String val = shared["server"].as<String>();
+//     if (val != String(deviceSettings.SERVER)) {
+//       val.toCharArray(deviceSettings.SERVER, sizeof(deviceSettings.SERVER));
+//       updated = true;
+//       mqttNeedsRestart = true;
+//       Serial.println("🌐 Updated server");
+//     }
+//   }
+
+//   // --- Port
+//   if (shared.containsKey("port")) {
+//     JsonVariant p = shared["port"];
+//     int newPort = p.is<int>() ? p.as<int>() : String(p.as<const char*>()).toInt();
+//     if (newPort != deviceSettings.port && newPort != 0) {
+//       deviceSettings.port = newPort;
+//       updated = true;
+//       mqttNeedsRestart = true;
+//       Serial.println("🔌 Updated port");
+//     }
+//   }
+
+//   // --- telemetryInterval
+//   if (shared.containsKey("telemetryInterval")) {
+//     JsonVariant t = shared["telemetryInterval"];
+//     int newInterval = t.is<int>() ? t.as<int>() : String(t.as<const char*>()).toInt();
+//     if (newInterval != deviceSettings.telemetryInterval && newInterval > 0) {
+//       deviceSettings.telemetryInterval = newInterval;
+//       updated = true;
+//       Serial.println("📊 Updated telemetryInterval");
+//     }
+//   }
+
+//   // --- High Critical Value
+//   if (shared.containsKey("High_Critical_Value")) {
+//     JsonVariant hcv = shared["High_Critical_Value"];
+//     float newHigh = hcv.is<float>() ? hcv.as<float>() : String(hcv.as<const char*>()).toFloat();
+//     if (newHigh != high_critical_value && newHigh != 0) {
+//       high_critical_value = newHigh;
+//       Serial.println("📈 Updated High_Critical_Value to: " + String(high_critical_value, 1));
+//     }
+//   }
+
+//   // --- Low Critical Value
+//   if (shared.containsKey("Low_Critical_Value")) {
+//     JsonVariant lcv = shared["Low_Critical_Value"];
+//     float newLow = lcv.is<float>() ? lcv.as<float>() : String(lcv.as<const char*>()).toFloat();
+//     if (newLow != low_critical_value) {
+//       low_critical_value = newLow;
+//       Serial.println("📉 Updated Low_Critical_Value to: " + String(low_critical_value, 1));
+//     }
+//   }
+
+//   // --- Save & Act
+//   if (updated) {
+//     Serial.println("💾 Attributes updated, saving config...");
+//     saveConfig(config_filename);
+
+//     if (mqttNeedsRestart) {
+//       Serial.println("🔄 Critical config changed. Restarting Device!");
+//       ESP.restart();
+//     }
+//   } else {
+//     Serial.println("✔️ Parameters Updated. Restart not required");
+//   }
+// }
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println("📥 MQTT Callback Triggered");
   Serial.print("📨 Topic: ");
   Serial.println(topic);
-  String topicStr = String(topic);
 
-  // Convert payload to JSON string
+  // Convert payload to String
   String json;
   for (unsigned int i = 0; i < length; i++) {
     json += (char)payload[i];
@@ -302,27 +392,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
-  // Handle both wrapped and flat payloads
   JsonObject root = doc.as<JsonObject>();
   JsonObject shared = root.containsKey("shared") ? root["shared"].as<JsonObject>() : root;
 
-  if (String(topic).startsWith("v1/devices/me/attributes/response")) {
-    StaticJsonDocument<512> doc;
-    attributesReceived = true;  // ✅ Set flag
-    DeserializationError error = deserializeJson(doc, payload, length);
+  // Handle digital output updates for both wrapped and flat formats
+  handleDigitalOutputAttributesPayload(shared);
 
-    if (!error) {
-      JsonObject shared = doc["shared"];
-      if (!shared.isNull()) {
-        handleDigitalOutputAttributesPayload(shared);
-      }
-    } else {
-      Serial.print("❌ JSON Parse error: ");
-      Serial.println(error.c_str());
-    }
+  // Handle general parameters only for response topic
+  String topicStr = String(topic);
+  if (topicStr.startsWith("v1/devices/me/attributes/response")) {
+    attributesReceived = true;
   }
 
-
+  // -------- GENERAL PARAMETER UPDATES --------
   bool updated = false;
   bool mqttNeedsRestart = false;
 
@@ -401,9 +483,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
       ESP.restart();
     }
   } else {
-    Serial.println("✔️ Parameters Updated. Restart not required");
+    Serial.println("✔️ Parameters Updated.");
   }
 }
+
 
 void maintainWiFiConnection() {
   static unsigned long lastCheck = 0;
@@ -479,6 +562,7 @@ void maintainWiFiConnection() {
 
 unsigned long lastSent = 0;
 void telemetryLoop() {
+
 #ifdef USE_WIFI
   maintainWiFiConnection();
 #endif
@@ -488,15 +572,79 @@ void telemetryLoop() {
 #endif
   if (millis() - lastSent > deviceSettings.telemetryInterval * 1000) {
     if (mqttClient.connected()) {
-      // if (telemetryPayload.length() > 2) {  // avoids sending empty {}
-      //   if (mqttClient.publish("v1/devices/me/telemetry", telemetryPayload.c_str())) {
-      //     Serial.println("📡 Published: " + telemetryPayload);
-      //     lastSent = millis();
-      //   } else mqttConnect();
-      // }
       requestDigitalOutputAttributes();
+      sendDigitalOutputsTelemetry();
+      monitorDigitalInputs();
     }
   }
-
   mqttClient.loop();
 }
+
+
+void powerOnModem() {
+#ifdef blinkBoard
+  pinMode(MODEM_RST, OUTPUT);
+  digitalWrite(MODEM_RST, LOW);
+  delay(100);
+  digitalWrite(MODEM_RST, HIGH);
+  delay(5000);  // Allow modem to boot up
+#endif
+
+#ifdef powWaterBoard
+  pinMode(MODEM_RST, OUTPUT);
+  digitalWrite(MODEM_RST, HIGH);
+  delay(100);
+  digitalWrite(MODEM_RST, LOW);
+  delay(5000);  // Allow modem to boot up
+#endif
+}
+
+
+
+// --- GSM MQTT Maintenance Function
+void maintainGSMConnectivity() {
+  SerialAT.begin(MODEM_BAUD, SERIAL_8N1, MODEM_RX, MODEM_TX);
+  delay(3000);  // Give time for modem to wake
+  static unsigned long lastCheck = 0;
+  const unsigned long checkInterval = 10000;
+  static bool modemInitialized = false;
+
+  if (millis() - lastCheck < checkInterval && onStartup) return;
+  else onStartup = true;  // allow for GSM config on startup
+  lastCheck = millis();
+
+  // (Re)initialize modem if needed
+  if (!modemInitialized || !modem.isNetworkConnected()) {
+    SerialMon.println("⚠️ GSM not connected. Restarting modem...");
+    powerOnModem();
+    modem.restart();
+    modemInitialized = true;
+
+    if (!modem.waitForNetwork(30000L)) {
+      SerialMon.println("❌ Network not found");
+      modemInitialized = false;
+      return;
+    }
+    SerialMon.println("✅ GSM Network Connected");
+  }
+
+  // GPRS connection
+  if (!modem.isGprsConnected()) {
+    SerialMon.println("🌐 GPRS not connected. Attempting reconnect...");
+    if (!modem.gprsConnect(apn, gprsUser, gprsPass)) {
+      SerialMon.println("❌ GPRS failed");
+      networkConnected = false;
+      return;
+    }
+    SerialMon.println("✅ GPRS Connected");
+    networkConnected = true;
+  }
+
+  // MQTT connection
+  if (!mqttClient.connected()) {
+    mqttConnect();
+  }
+
+  mqttClient.loop();  // Always call loop to maintain MQTT connection
+}
+

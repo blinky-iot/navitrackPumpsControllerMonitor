@@ -17,7 +17,7 @@ void setup() {
   initWatchdog();
   lcdBegin();
   initialiseOutputs();
-  setupSensors();
+  
   displayTask();
 
   initSettings();
@@ -32,10 +32,10 @@ void setup() {
   maintainGSMConnectivity();
 #endif
   hourlyResetSetup();
+ 
 }
 
 void loop() {
   telemetryLoop();
-  //controlLoop();
   esp_task_wdt_reset();  // Feed the watchdog
 }

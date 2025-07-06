@@ -14,6 +14,8 @@
 #include <TinyGsmClient.h>
 #include <StreamDebugger.h>
 
+#include <Wire.h>
+
 bool onStartup = false;
 
 
@@ -161,7 +163,21 @@ static bool backlightState = true;
 
 // Example: 2 shift registers = 8 outputs
 ShiftRegister74HC595<2> sr(23, 18, 5);  // (dataPin, clockPin, latchPin)
-uint8_t outputStates[2] = { 0x00};  // Persistent buffer: 8 outputs (1 bytes)
+uint8_t outputStates[2] = { 0x00 };     // Persistent buffer: 8 outputs (1 bytes)
 
-uint8_t outputBuffer = 0; // Holds output state (bits 0–7)
+uint8_t outputBuffer = 0;                              // Holds output state (bits 0–7)
+uint8_t lastTelemetryBuffer = 0;                       // Last sent state
+unsigned long lastTelemetrySent = 0;                   // Timestamp of last send
+const unsigned long digitalTelemetryInterval = 30000;  // in milliseconds (e.g., 30s)
+uint8_t lastDigitalTelemetryBuffer = 0;
+unsigned long lastDigitalTelemetrySent = 0;
+
+
+
+// === DigitalInputs ===
+uint8_t digitalInputBuffer = 0xFF;         // Holds current state of PCF8574 inputs
+uint8_t lastDigitalInputBuffer = 0xFF;     // Previous state for change detection
+unsigned long lastDigitalTelemetryTime = 0;
+const unsigned long digitalInputsTelemetryInterval = 30000;  // in ms
+#define PCF8574_ADDR 0x3E
 
