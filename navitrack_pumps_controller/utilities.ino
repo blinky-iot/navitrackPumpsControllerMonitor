@@ -123,8 +123,16 @@ void outputUpdateTask(void* parameter) {
       sr.setAll(&outputBuffer);  // Push the updated output state to the shift register
       previousState = outputBuffer;
 
+      // Serial.print("🔄 Output buffer updated: ");
+      // Serial.println(outputBuffer, BIN);  // Print binary for visibility
+      char binStr[9];  // 8 bits + null terminator
+      for (int i = 7; i >= 0; i--) {
+        binStr[7 - i] = bitRead(outputBuffer, i) ? '1' : '0';
+      }
+      binStr[8] = '\0';  // null-terminate the string
+
       Serial.print("🔄 Output buffer updated: ");
-      Serial.println(outputBuffer, BIN);  // Print binary for visibility
+      Serial.println(binStr);
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));  // Check every 100ms

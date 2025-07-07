@@ -34,7 +34,7 @@ void monitorDigitalInputs() {
   unsigned long now = millis();
 
   bool changed = (currentState != digitalInputBuffer);
-  bool intervalElapsed = (now - lastDigitalTelemetryTime > digitalInputsTelemetryInterval);
+  bool intervalElapsed = (now - lastDigitalTelemetryTime > deviceSettings.telemetryInterval * 1000);
 
   if (changed || intervalElapsed) {
     digitalInputBuffer = currentState;

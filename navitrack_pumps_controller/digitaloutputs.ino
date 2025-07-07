@@ -1,25 +1,69 @@
+// bool requestDigitalOutputAttributes() {
+//   bool intervalElapsed = (now - lastDigitalTelemetryTime > deviceSettings.telemetryInterval * 1000);
+//   attributesReceived = false;
+//   if (intervalElapsed) {
+//     // Request DO0–DO7 shared attributes from ThingsBoard
+//     String payload = "{\"sharedKeys\":\"DO0,DO1,DO2,DO3,DO4,DO5,DO6,DO7\"}";
+//     Serial.println("📡 Requested DO0–DO7 attributes");
+
+//     bool success = mqttClient.publish("v1/devices/me/attributes/request/1", payload.c_str());
+//     if (success) {
+//       Serial.println("✅ Digital Output Attribute Request Successful");
+//     } else {
+//       Serial.println("❌ Digital Output Attribute Request Failed");
+//       return false;
+//     }
+
+//     // Allow time for callback to process the response
+//     unsigned long start = millis();
+//     while (!attributesReceived && millis() - start < 10000) {
+//       mqttClient.loop();  // critical for receiving the attributes
+//       delay(10);          // prevent watchdog timeout
+//     }
+
+//     return true;
+//   }
+// }
+
 bool requestDigitalOutputAttributes() {
+  static bool onstartup = true;
+  unsigned long now = millis();
+  bool intervalElapsed = (now - lastAttributesRequestTime > deviceSettings.telemetryInterval * 1000 || onstartup);
+
+  if (!intervalElapsed) {
+    return false;  // No need to request yet
+  }
+
   attributesReceived = false;
-  // Request DO0–DO7 shared attributes from ThingsBoard
+
+  // Construct request payload
   String payload = "{\"sharedKeys\":\"DO0,DO1,DO2,DO3,DO4,DO5,DO6,DO7\"}";
-  Serial.println("📡 Requested DO0–DO7 attributes");
+  Serial.println("📡 Requesting DO0–DO7 attributes...");
 
   bool success = mqttClient.publish("v1/devices/me/attributes/request/1", payload.c_str());
-  if (success) {
-    Serial.println("✅ Digital Output Attribute Request Successful");
-  } else {
+  if (!success) {
     Serial.println("❌ Digital Output Attribute Request Failed");
     return false;
   }
 
-  // Allow time for callback to process the response
+  Serial.println("✅ Attribute request published successfully");
+
+  // Wait up to 10 seconds for response
   unsigned long start = millis();
   while (!attributesReceived && millis() - start < 10000) {
-    mqttClient.loop();  // critical for receiving the attributes
-    delay(10);          // prevent watchdog timeout
+    mqttClient.loop();
+    delay(10);
   }
 
-  return true;
+  if (attributesReceived) {
+    Serial.println("📥 Attributes received successfully");
+    lastAttributesRequestTime = now;
+    onstartup = false;
+    return true;
+  } else {
+    Serial.println("⚠️ Timed out waiting for attribute response");
+    return false;
+  }
 }
 
 
@@ -59,7 +103,7 @@ void sendDigitalOutputsTelemetry() {
   }
 
   bool changed = (outputBuffer != lastDigitalTelemetryBuffer);
-  bool intervalElapsed = (millis() - lastDigitalTelemetrySent > digitalTelemetryInterval);
+  bool intervalElapsed = (millis() - lastDigitalTelemetrySent > deviceSettings.telemetryInterval * 1000);
 
   if (changed || intervalElapsed) {
     StaticJsonDocument<128> doc;

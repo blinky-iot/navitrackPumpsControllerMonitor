@@ -171,13 +171,13 @@ unsigned long lastTelemetrySent = 0;                   // Timestamp of last send
 const unsigned long digitalTelemetryInterval = 30000;  // in milliseconds (e.g., 30s)
 uint8_t lastDigitalTelemetryBuffer = 0;
 unsigned long lastDigitalTelemetrySent = 0;
+unsigned long lastAttributesRequestTime = 0;
 
 
 
 // === DigitalInputs ===
-uint8_t digitalInputBuffer = 0xFF;         // Holds current state of PCF8574 inputs
-uint8_t lastDigitalInputBuffer = 0xFF;     // Previous state for change detection
+uint8_t digitalInputBuffer = 0xFF;      // Holds current state of PCF8574 inputs
+uint8_t lastDigitalInputBuffer = 0xFF;  // Previous state for change detection
 unsigned long lastDigitalTelemetryTime = 0;
 const unsigned long digitalInputsTelemetryInterval = 30000;  // in ms
 #define PCF8574_ADDR 0x3E
-

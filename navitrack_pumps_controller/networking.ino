@@ -90,6 +90,7 @@ bool mqttConnect() {
       Serial.println("✅ MQTT connected");
       mqttConnected = true;
       requestSharedAttributes();
+      requestDigitalOutputAttributes();
       return true;
     } else {
       Serial.print("❌ MQTT connect failed. State: ");
@@ -572,11 +573,14 @@ void telemetryLoop() {
 #endif
   if (millis() - lastSent > deviceSettings.telemetryInterval * 1000) {
     if (mqttClient.connected()) {
-      requestDigitalOutputAttributes();
-      sendDigitalOutputsTelemetry();
-      monitorDigitalInputs();
+      //requestDigitalOutputAttributes();
+      //sendDigitalOutputsTelemetry();
+      //monitorDigitalInputs();
     }
   }
+  sendDigitalOutputsTelemetry();
+  monitorDigitalInputs();
+  requestDigitalOutputAttributes();
   mqttClient.loop();
 }
 
@@ -647,4 +651,3 @@ void maintainGSMConnectivity() {
 
   mqttClient.loop();  // Always call loop to maintain MQTT connection
 }
-
